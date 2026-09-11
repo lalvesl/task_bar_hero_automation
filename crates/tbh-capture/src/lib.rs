@@ -120,13 +120,26 @@ pub trait Capture {
     /// Where the window currently sits. Click points are resolved against this,
     /// so it is read per action rather than cached.
     ///
+    /// Takes `&mut self` because the game replaces its window during loading,
+    /// and the binding has to be re-established when that happens.
+    ///
     /// # Errors
     /// Fails if the window has gone away or the connection broke.
-    fn window_rect(&self) -> Result<WindowRect, CaptureError>;
+    fn window_rect(&mut self) -> Result<WindowRect, CaptureError>;
 
-    /// Grab the window's current contents.
+    /// Grab the window current contents.
     ///
     /// # Errors
     /// Fails if the window has gone away or the connection broke.
     fn grab(&mut self) -> Result<Frame, CaptureError>;
+
+    /// Give the window the keyboard focus.
+    ///
+    /// Part of the trait because keys are useless without it: the isolated
+    /// display has no window manager, so the server stays on `PointerRoot` and
+    /// a key press lands wherever the pointer happens to be.
+    ///
+    /// # Errors
+    /// Fails if the window has gone away or the connection broke.
+    fn focus(&mut self) -> Result<(), CaptureError>;
 }
