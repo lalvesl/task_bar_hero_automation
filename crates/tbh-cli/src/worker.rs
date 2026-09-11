@@ -6,11 +6,11 @@
 //! be shared across threads but the switches.
 
 use std::thread::sleep;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use tbh_capture::x11::X11Capture;
-use tbh_core::config::Config;
 use tbh_core::chest;
+use tbh_core::config::Config;
 use tbh_core::cube;
 use tbh_input::x11::X11Input;
 
@@ -52,17 +52,11 @@ pub fn run(config: &Config, control: &Control) {
 
         let (shutdown, run_cube, run_chests) = {
             let state = lock(control);
-            let cube_due = state.synthesis_now
-                || state
-                    .synthesis_last
-                    .is_none_or(|last| last.elapsed() >= cube_interval);
-            let chests_due = state
-                .chests_last
-                .is_none_or(|last| last.elapsed() >= chest_interval);
             (
                 state.shutdown,
-                state.synthesis_enabled && cube_due,
-                state.chests_enabled && chests_due,
+                state.synthesis.enabled
+                    && (state.synthesis_now || state.synthesis.due(cube_interval)),
+                state.chests.enabled && state.chests.due(chest_interval),
             )
         };
 
@@ -90,14 +84,13 @@ pub fn run(config: &Config, control: &Control) {
                     result.synthesized, result.outcome
                 );
                 let mut state = lock(control);
-                state.synthesis_result = Some(result);
-                state.synthesis_last = Some(Instant::now());
+                state.synthesis.finished(Some(result));
                 state.synthesis_now = false;
             }
             Err(error) => {
                 eprintln!("synthesis: {error}");
                 let mut state = lock(control);
-                state.synthesis_last = Some(Instant::now());
+                state.synthesis.finished(None);
                 state.synthesis_now = false;
             }
         }
@@ -135,13 +128,11 @@ fn sweep_chests(
             if pass.clicked > 0 {
                 println!("chests: {} found, {} clicked", pass.found, pass.clicked);
             }
-            let mut state = lock(control);
-            state.chests_result = Some(pass);
-            state.chests_last = Some(Instant::now());
+            lock(control).chests.finished(Some(pass));
         }
         Err(error) => {
             eprintln!("chests: {error}");
-            lock(control).chests_last = Some(Instant::now());
+            lock(control).chests.finished(None);
         }
     }
 }
