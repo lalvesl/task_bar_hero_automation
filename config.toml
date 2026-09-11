@@ -1,0 +1,67 @@
+# Tunables for the bot. Everything here is calibrated against a real game
+# window; see docs/ui_map.md for where each point came from and why the
+# synthesize check is written as a channel comparison rather than a colour
+# match.
+#
+# Points are fractions of the game window, never screen pixels, so they survive
+# the window moving and the virtual screen being resized.
+
+display = ":9"
+window = "TaskBarHero"
+
+[stash]
+menu_icon = { x = 0.382, y = 0.723 }
+store_all = { x = 0.212, y = 0.728 }
+
+[cube]
+# The task on-off switch. Off by default: a bot that clicks on its own should
+# not start clicking merely because the process came up. Turn it on with
+# "enable synthesis" at the prompt.
+enabled = false
+
+# Deposit the inventory into the stash first. Auto-fill draws from the stash
+# too, so this is what makes a full inventory available to the cube.
+store_all_first = true
+
+# Seconds between runs while the task is enabled.
+interval_secs = 600
+
+# A stop that does not depend on reading the screen correctly.
+max_per_run = 100
+
+menu_icon = { x = 0.559, y = 0.723 }
+auto_fill = { x = 0.765, y = 0.595 }
+synthesize = { x = 0.906, y = 0.595 }
+
+# Disabled, the button is pure grey and every channel is equal. Enabled, it is
+# blue and leads red by around 80 at these three pixels. A margin of 40 sits
+# clear of both.
+[cube.synthesize_enabled]
+lead = "blue"
+over = "red"
+min_delta = 40
+points = [
+  { x = 0.8746, y = 0.5830 },
+  { x = 0.9241, y = 0.6081 },
+  { x = 0.9364, y = 0.5955 },
+]
+
+[chest]
+# The task on-off switch. Off by default, same reasoning as the cube.
+enabled = false
+
+# Seconds between passes. Every pass costs a capture and a scan, so this is the
+# bot's own power knob on a machine whose CPU clock is held down on purpose.
+interval_secs = 2.0
+
+# A stop that does not depend on reading the band correctly.
+max_clicks_per_pass = 8
+
+# Chests drop onto pure black, so finding them is a scan for columns that are
+# not black rather than a template match. Measured against a real capture: two
+# chests, 75 columns wide each, six columns of background between them.
+[chest.scan]
+region = { x = 0.300, y = 0.145, width = 0.400, height = 0.053 }
+min_luma = 24
+max_gap = 0.005
+min_width = 0.020
