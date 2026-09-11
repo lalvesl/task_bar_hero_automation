@@ -8,6 +8,7 @@
 pub mod chest;
 pub mod config;
 pub mod cube;
+pub mod restore;
 
 /// Which farming task a state belongs to.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
