@@ -13,5 +13,10 @@ pkgs: with pkgs; [
   xdpyinfo
   imagemagick
   socat # the loopback forwarder in scripts/xserver.sh
+
+  # The "show" mirror: x11vnc attaches to the isolated display, tigervnc draws
+  # the window on the host desktop.
+  x11vnc
+  tigervnc
   xorg-server # provides Xvfb and Xephyr
 ]
