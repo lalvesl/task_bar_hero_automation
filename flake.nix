@@ -55,6 +55,17 @@
               prettier
             ]
             ++ x11Tools;
+
+          # The bot reads the isolated display cookie from XAUTHORITY, and the
+          # binary cannot set it for itself: doing that from Rust needs
+          # `unsafe`, which the workspace forbids. Exporting it here is what
+          # makes a plain `cargo run -- run` work from the shell.
+          #
+          # The file need not exist yet. `tbh run` starts the display, which
+          # writes it, before anything connects.
+          shellHook = ''
+            export XAUTHORITY="''${XDG_RUNTIME_DIR:-/tmp}/tbh-automation/Xauthority"
+          '';
         };
 
         apps.fmt = {
