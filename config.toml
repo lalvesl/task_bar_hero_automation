@@ -54,14 +54,20 @@ enabled = false
 # bot's own power knob on a machine whose CPU clock is held down on purpose.
 interval_secs = 2.0
 
+# The row can hold more than the two slots seen during calibration, so the
+# region is wider than the combat strip above it and the cap is generous.
 # A stop that does not depend on reading the band correctly.
-max_clicks_per_pass = 8
+max_clicks_per_pass = 16
 
 # Chests drop onto pure black, so finding them is a scan for columns that are
 # not black rather than a template match. Measured against a real capture: two
 # chests, 75 columns wide each, six columns of background between them.
+#
+# max_gap has to stay under that six-column separation: set to 0.005, which is
+# six pixels at this window size, the two chests merged into one blob and every
+# click landed in the gap between them.
 [chest.scan]
-region = { x = 0.300, y = 0.145, width = 0.400, height = 0.053 }
+region = { x = 0.230, y = 0.145, width = 0.540, height = 0.053 }
 min_luma = 24
-max_gap = 0.005
+max_gap = 0.002
 min_width = 0.020
