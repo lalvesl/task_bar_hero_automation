@@ -9,6 +9,23 @@
 display = ":9"
 window = "TaskBarHero"
 
+# How long to stand down after you click in the viewer. A person and the bot
+# clicking the same UI would fight, so every click of yours pushes this out
+# again and the bot only resumes once you have stopped.
+pause_after_click_secs = 5.0
+
+# How long to wait after the window appears before doing anything. The game
+# plays a long opening sequence, and a click during it lands on whatever the
+# intro is drawing rather than on the UI the task expects.
+startup_delay_secs = 30.0
+
+# TBH: Task Bar Hero on Steam. The launch options for this app id are what point
+# the game at the isolated display.
+steam_app_id = 3678970
+
+# Loopback port the "show" mirror serves on.
+vnc_port = 5909
+
 [stash]
 menu_icon = { x = 0.382, y = 0.723 }
 store_all = { x = 0.212, y = 0.728 }
@@ -71,3 +88,38 @@ region = { x = 0.230, y = 0.145, width = 0.540, height = 0.053 }
 min_luma = 24
 max_gap = 0.002
 min_width = 0.020
+
+# The offline-rewards dialog the game opens on launch. It sits over everything
+# and swallows clicks, so it is closed before anything else is attempted.
+#
+# Its presence is checked rather than the close button being clicked blindly:
+# with no dialog up, that position sits inside the hero panel.
+[popup]
+close = { x = 0.500, y = 0.677 }
+
+# The dialog's title banner is red; with no dialog there, the same pixels are
+# pure black. Red leading blue separates the two without depending on an exact
+# shade, the same shape of test the synthesize button uses.
+[popup.visible]
+lead = "red"
+over = "blue"
+min_delta = 30
+points = [
+  { x = 0.4373, y = 0.3731 },
+  { x = 0.5528, y = 0.3731 },
+  { x = 0.4950, y = 0.3659 },
+]
+
+# The main menu. Whether it is open decides how many times Tab has to be
+# pressed to leave it open, and guessing gets that wrong half the time.
+#
+# Its title banner is red; with the menu closed the same pixels are black.
+[menu.visible]
+lead = "red"
+over = "blue"
+min_delta = 30
+points = [
+  { x = 0.4455, y = 0.2978 },
+  { x = 0.5545, y = 0.2978 },
+  { x = 0.5000, y = 0.3049 },
+]
