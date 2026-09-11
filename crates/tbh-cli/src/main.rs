@@ -69,7 +69,10 @@ fn run(args: &RunArgs) -> anyhow::Result<()> {
     let config =
         Config::load(&args.config).with_context(|| format!("loading {}", args.config.display()))?;
 
-    let control = Arc::new(Mutex::new(control::State::new(config.cube.enabled, config.chest.enabled)));
+    let control = Arc::new(Mutex::new(control::State::new(
+        config.cube.enabled,
+        config.chest.enabled,
+    )));
 
     // The worker owns the X connections, so the configuration moves into it
     // rather than being borrowed across the thread boundary.
