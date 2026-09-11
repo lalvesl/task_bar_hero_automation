@@ -5,7 +5,9 @@
 //! numbers are not hardcoded, because they are retuned constantly during
 //! calibration and recompiling per attempt would kill the feedback loop.
 
+pub mod chest;
 pub mod config;
+pub mod cube;
 
 /// Which farming task a state belongs to.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
