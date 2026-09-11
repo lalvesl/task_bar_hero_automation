@@ -5,8 +5,8 @@
 //! and a reader that blocks for the length of a boolean read is not a problem
 //! this program has.
 
-use std::sync::{Arc, Mutex};
-use std::time::Instant;
+use std::sync::{Arc, Mutex, PoisonError};
+use std::time::{Duration, Instant};
 
 use tbh_core::chest::ChestPass;
 use tbh_core::cube::CubeRun;
@@ -16,7 +16,7 @@ use tbh_core::cube::CubeRun;
 pub enum Task {
     /// Equipment synthesis in the cube.
     Synthesis,
-    /// Clicking dropped chests.
+    /// Collecting from the chest slots.
     Chests,
 }
 
@@ -44,24 +44,56 @@ impl Task {
     }
 }
 
+/// One task's switch and its last result.
+#[derive(Debug)]
+pub struct TaskState<R> {
+    /// Whether the task may run.
+    pub enabled: bool,
+    /// When it last finished, if it has.
+    pub last: Option<Instant>,
+    /// What that run did, absent if it failed.
+    pub result: Option<R>,
+}
+
+impl<R> TaskState<R> {
+    /// Start from the configuration's own switch.
+    const fn new(enabled: bool) -> Self {
+        Self {
+            enabled,
+            last: None,
+            result: None,
+        }
+    }
+
+    /// Whether enough time has passed to run again.
+    ///
+    /// A task that has never run is due immediately, so enabling one does not
+    /// mean waiting out a full interval first.
+    pub fn due(&self, interval: Duration) -> bool {
+        self.last.is_none_or(|last| last.elapsed() >= interval)
+    }
+
+    /// Record a finished run.
+    pub fn finished(&mut self, result: Option<R>) {
+        self.result = result;
+        self.last = Some(Instant::now());
+    }
+
+    /// How long ago it last ran.
+    pub fn since(&self) -> Option<Duration> {
+        self.last.map(|last| last.elapsed())
+    }
+}
+
 /// What the worker is allowed to do, and what it last did.
 #[derive(Debug)]
 pub struct State {
-    /// Whether the synthesis task may run.
-    pub synthesis_enabled: bool,
+    /// Equipment synthesis in the cube.
+    pub synthesis: TaskState<CubeRun>,
     /// Set by `run synthesis` to skip the wait for the next interval.
     pub synthesis_now: bool,
-    /// When the synthesis task last finished, if it has.
-    pub synthesis_last: Option<Instant>,
-    /// What that run did.
-    pub synthesis_result: Option<CubeRun>,
-    /// Whether the chest task may run.
-    pub chests_enabled: bool,
-    /// When the chest task last ran, if it has.
-    pub chests_last: Option<Instant>,
-    /// What that pass did.
-    pub chests_result: Option<ChestPass>,
-
+    /// Collecting from the chest slots.
+    pub chests: TaskState<ChestPass>,
     /// Set by `quit`, so the worker can finish its current step and stop.
     pub shutdown: bool,
 }
@@ -71,13 +103,9 @@ impl State {
     #[must_use]
     pub const fn new(synthesis_enabled: bool, chests_enabled: bool) -> Self {
         Self {
-            synthesis_enabled,
+            synthesis: TaskState::new(synthesis_enabled),
             synthesis_now: false,
-            synthesis_last: None,
-            synthesis_result: None,
-            chests_enabled,
-            chests_last: None,
-            chests_result: None,
+            chests: TaskState::new(chests_enabled),
             shutdown: false,
         }
     }
@@ -92,7 +120,5 @@ pub type Control = Arc<Mutex<State>>;
 /// is a few switches, none of which can be left half-written, so carrying on is
 /// better than bringing the whole process down with it.
 pub fn lock(control: &Control) -> std::sync::MutexGuard<'_, State> {
-    control
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner)
+    control.lock().unwrap_or_else(PoisonError::into_inner)
 }
