@@ -71,8 +71,8 @@ fn set_enabled(control: &Control, rest: &str, enabled: bool) {
     };
 
     match task {
-        Task::Synthesis => lock(control).synthesis_enabled = enabled,
-        Task::Chests => lock(control).chests_enabled = enabled,
+        Task::Synthesis => lock(control).synthesis.enabled = enabled,
+        Task::Chests => lock(control).chests.enabled = enabled,
     }
     println!(
         "{} is now {}",
@@ -94,7 +94,7 @@ fn run_now(control: &Control, rest: &str) {
             // would let a slow terminal stall the worker.
             let queued = {
                 let mut state = lock(control);
-                let enabled = state.synthesis_enabled;
+                let enabled = state.synthesis.enabled;
                 state.synthesis_now |= enabled;
                 enabled
             };
@@ -113,42 +113,38 @@ fn run_now(control: &Control, rest: &str) {
 /// Report the switches and the last result.
 fn status(control: &Control) {
     let state = lock(control);
-    println!(
-        "synthesis: {}",
-        if state.synthesis_enabled {
-            "enabled"
-        } else {
-            "disabled"
-        }
+    report(
+        "synthesis",
+        state.synthesis.enabled,
+        state.synthesis.since(),
+        || {
+            state.synthesis.result.map(|run| {
+                format!(
+                    "{} synthesised, stopped because {:?}",
+                    run.synthesized, run.outcome
+                )
+            })
+        },
     );
+    report("chests", state.chests.enabled, state.chests.since(), || {
+        state
+            .chests
+            .result
+            .map(|pass| format!("{} found, {} clicked", pass.found, pass.clicked))
+    });
+}
 
-    match (state.synthesis_last, state.synthesis_result) {
-        (Some(last), Some(result)) => println!(
-            "  last run {}s ago: {} synthesised, stopped because {:?}",
-            last.elapsed().as_secs(),
-            result.synthesized,
-            result.outcome
-        ),
-        (Some(last), None) => println!("  last run {}s ago: failed", last.elapsed().as_secs()),
-        _ => println!("  has not run yet"),
-    }
-
-    println!(
-        "chests: {}",
-        if state.chests_enabled {
-            "enabled"
-        } else {
-            "disabled"
-        }
-    );
-    match (state.chests_last, state.chests_result) {
-        (Some(last), Some(pass)) => println!(
-            "  last pass {}s ago: {} found, {} clicked",
-            last.elapsed().as_secs(),
-            pass.found,
-            pass.clicked
-        ),
-        (Some(last), None) => println!("  last pass {}s ago: failed", last.elapsed().as_secs()),
+/// Print one task's line, and the line about its last run.
+fn report(
+    name: &str,
+    enabled: bool,
+    since: Option<std::time::Duration>,
+    describe: impl FnOnce() -> Option<String>,
+) {
+    println!("{name}: {}", if enabled { "enabled" } else { "disabled" });
+    match (since, describe()) {
+        (Some(since), Some(what)) => println!("  last run {}s ago: {what}", since.as_secs()),
+        (Some(since), None) => println!("  last run {}s ago: failed", since.as_secs()),
         _ => println!("  has not run yet"),
     }
 }
