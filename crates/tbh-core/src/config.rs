@@ -15,14 +15,50 @@ use tbh_vision::scan::ChestScan;
 pub struct Config {
     /// Which X display the game was launched onto.
     pub display: String,
-    /// Substring of the game window's title.
+    /// Substring of the game window title.
     pub window: String,
+
+    /// How long the bot stands down after a person clicks in the viewer.
+    pub pause_after_click_secs: f32,
+
+    /// How long to wait after the window appears before acting at all.
+    ///
+    /// The game plays a long opening sequence, and a click during it lands on
+    /// whatever the intro happens to be drawing.
+    pub startup_delay_secs: f32,
+
+    /// The game Steam app id, used to launch it.
+    pub steam_app_id: u32,
+
+    /// Loopback port the `show` mirror serves on.
+    pub vnc_port: u16,
     /// The stash panel.
     pub stash: StashConfig,
     /// The cube task.
     pub cube: CubeConfig,
     /// The chest task.
     pub chest: ChestConfig,
+    /// The launch dialog.
+    pub popup: PopupConfig,
+    /// The main menu.
+    pub menu: MenuConfig,
+}
+
+/// The main menu, and how to tell whether it is open.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MenuConfig {
+    /// How to tell whether the menu is on screen.
+    pub visible: ChannelLead,
+}
+
+/// The dialog the game opens on launch, and how to be rid of it.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PopupConfig {
+    /// The button that closes it.
+    pub close: NormalizedPoint,
+
+    /// How to tell whether it is up.
+    pub visible: ChannelLead,
 }
 
 /// The chest task: whether it runs, how often, and where to look.
