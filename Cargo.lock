@@ -716,6 +716,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "tbh-cli"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "tbh-capture",
+ "tbh-core",
+ "tbh-input",
+ "tbh-vision",
+]
+
+[[package]]
 name = "tbh-core"
 version = "0.1.0"
 dependencies = [
@@ -732,20 +744,10 @@ dependencies = [
 name = "tbh-input"
 version = "0.1.0"
 dependencies = [
+ "serde",
+ "tbh-capture",
  "thiserror",
  "x11rb",
-]
-
-[[package]]
-name = "tbh-tui"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap",
- "tbh-capture",
- "tbh-core",
- "tbh-input",
- "tbh-vision",
 ]
 
 [[package]]
