@@ -82,7 +82,10 @@ impl X11Capture {
         if width > screen_width || height > screen_height {
             return Err(CaptureError::WindowLargerThanScreen {
                 window: (rect.width, rect.height),
-                screen: (screen.width_in_pixels.into(), screen.height_in_pixels.into()),
+                screen: (
+                    screen.width_in_pixels.into(),
+                    screen.height_in_pixels.into(),
+                ),
             });
         }
 
@@ -93,18 +96,10 @@ impl X11Capture {
         }
 
         self.connection
-            .configure_window(
-                self.window,
-                &ConfigureWindowAux::new().x(x).y(y),
-            )
+            .configure_window(self.window, &ConfigureWindowAux::new().x(x).y(y))
             .map_err(to_reply_error)?
             .check()
-            .map_err(|error| match error {
-                x11rb::errors::ReplyError::X11Error(inner) => {
-                    CaptureError::Protocol(x11rb::errors::ReplyError::X11Error(inner))
-                }
-                other => CaptureError::Protocol(other),
-            })?;
+            .map_err(CaptureError::Protocol)?;
         Ok(())
     }
 
@@ -227,6 +222,6 @@ fn window_name(
 /// Collapse a connection-level failure into the same error type a rejected
 /// request produces. Callers cannot act differently on the two, and carrying
 /// both through every signature buys nothing.
-fn to_reply_error(error: x11rb::errors::ConnectionError) -> x11rb::errors::ReplyError {
+const fn to_reply_error(error: x11rb::errors::ConnectionError) -> x11rb::errors::ReplyError {
     x11rb::errors::ReplyError::ConnectionError(error)
 }
