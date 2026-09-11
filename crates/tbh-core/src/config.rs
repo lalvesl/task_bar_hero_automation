@@ -1,65 +1,131 @@
 //! The tunables, read from `config.toml`.
 //!
-//! Everything here is a number a human adjusts while calibrating against a real
-//! game window. None of it changes the shape of a state machine.
+//! Everything here is a number or a switch a human adjusts while calibrating
+//! against a real game window. None of it changes the shape of a state machine.
+
+use std::path::Path;
 
 use serde::{Deserialize, Serialize};
-use tbh_vision::{NormalizedRect, PixelSignature};
+use tbh_input::NormalizedPoint;
+use tbh_vision::ChannelLead;
+use tbh_vision::scan::ChestScan;
 
 /// The whole configuration file.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Config {
     /// Which X display the game was launched onto.
     pub display: String,
-    /// Settings for the chest task.
-    pub chest: ChestConfig,
-    /// Settings for the cube task.
+    /// Substring of the game window's title.
+    pub window: String,
+    /// The stash panel.
+    pub stash: StashConfig,
+    /// The cube task.
     pub cube: CubeConfig,
+    /// The chest task.
+    pub chest: ChestConfig,
 }
 
-/// Settings for the chest task.
+/// The chest task: whether it runs, how often, and where to look.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ChestConfig {
-    /// Seconds between frame grabs.
+    /// Whether the task runs at all.
+    pub enabled: bool,
+
+    /// Seconds between passes.
     ///
-    /// This is the bot's own power knob. Each cycle costs a capture and a
-    /// template match, and the machine this runs on holds its CPU clock down
-    /// deliberately.
-    pub poll_interval_secs: f32,
-    /// Minimum cross-correlation score for a chest sprite to count as found.
-    pub match_threshold: f32,
-    /// Where on screen chests can appear. Restricting this is the cheapest
-    /// speed-up available, because matching cost scales with area.
-    pub region: NormalizedRect,
-    /// Upper bound on clicks per poll, so a bad match cannot become a click
-    /// storm.
-    pub max_clicks_per_poll: u8,
+    /// This is the bot own power knob. Every pass costs a capture and a scan,
+    /// on a machine whose CPU clock is held down on purpose.
+    pub interval_secs: f32,
+
+    /// Upper bound on clicks in one pass, so a misread band cannot become a
+    /// click storm.
+    pub max_clicks_per_pass: u8,
+
+    /// How to find the chests.
+    pub scan: ChestScan,
 }
 
-/// Settings for the cube task.
+impl Config {
+    /// Read and parse a configuration file.
+    ///
+    /// # Errors
+    /// Fails if the file cannot be read or does not parse.
+    pub fn load(path: &Path) -> Result<Self, ConfigError> {
+        let text = std::fs::read_to_string(path).map_err(|source| ConfigError::Read {
+            path: path.display().to_string(),
+            source,
+        })?;
+        toml::from_str(&text).map_err(|source| ConfigError::Parse {
+            path: path.display().to_string(),
+            source,
+        })
+    }
+}
+
+/// Where the stash panel's controls are.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct StashConfig {
+    /// The stash icon on the main menu's bottom row.
+    pub menu_icon: NormalizedPoint,
+    /// The button that deposits the whole inventory.
+    pub store_all: NormalizedPoint,
+}
+
+/// The cube task: whether it runs, how, and where its controls are.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CubeConfig {
-    /// Seconds between cube runs.
+    /// Whether the task runs at all.
+    ///
+    /// The switch lives here rather than only in the UI so a run can be turned
+    /// off without the UI existing, and so the setting survives a restart.
+    pub enabled: bool,
+
+    /// Deposit the inventory into the stash before synthesizing.
+    ///
+    /// Auto-fill draws from the stash as well as the inventory, so depositing
+    /// first is what makes a full inventory available to the cube.
+    pub store_all_first: bool,
+
+    /// Seconds between runs while the task is enabled.
     pub interval_secs: u32,
-    /// Which rarity tier to synthesize up to.
-    pub target_rarity: Rarity,
-    /// The pixels that say whether the synthesize button is enabled.
-    pub synthesize_enabled: PixelSignature,
+
+    /// Upper bound on syntheses in one run.
+    ///
+    /// A stop that does not depend on reading the screen correctly. If the
+    /// enabled check ever misreads, this is what keeps a loop finite.
+    pub max_per_run: u16,
+
+    /// The cube icon on the main menu's bottom row.
+    pub menu_icon: NormalizedPoint,
+    /// The button that fills the grid.
+    pub auto_fill: NormalizedPoint,
+    /// The button that performs the synthesis.
+    pub synthesize: NormalizedPoint,
+
+    /// How to tell whether the synthesize button is enabled.
+    pub synthesize_enabled: ChannelLead,
 }
 
-/// A gear rarity tier.
-///
-/// The tasks never read an item's rarity off the screen; auto-fill picks the
-/// items. This only names which tier the cube is set to work on.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum Rarity {
-    /// The lowest tier.
-    Grey,
-    /// One above grey.
-    Green,
-    /// One above green.
-    Blue,
-    /// One above blue.
-    Purple,
+/// Everything that can go wrong while loading configuration.
+#[derive(Debug, thiserror::Error)]
+pub enum ConfigError {
+    /// The file could not be read.
+    #[error("cannot read {path}: {source}")]
+    Read {
+        /// The path that failed.
+        path: String,
+        /// The underlying failure.
+        #[source]
+        source: std::io::Error,
+    },
+
+    /// The file is not valid TOML, or does not match the schema.
+    #[error("cannot parse {path}: {source}")]
+    Parse {
+        /// The path that failed.
+        path: String,
+        /// The underlying failure.
+        #[source]
+        source: toml::de::Error,
+    },
 }
