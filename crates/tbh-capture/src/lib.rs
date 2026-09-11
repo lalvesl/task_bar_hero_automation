@@ -38,6 +38,22 @@ pub struct Frame {
 }
 
 impl Frame {
+    /// The red, green and blue of one pixel, or `None` if the coordinates fall
+    /// outside the frame.
+    ///
+    /// Bounds are returned rather than panicking because the caller is usually
+    /// resolving a normalized point against a window whose size it read a
+    /// moment ago, and the window can change underneath it.
+    #[must_use]
+    pub fn pixel(&self, x: u32, y: u32) -> Option<[u8; 3]> {
+        if x >= self.width || y >= self.height {
+            return None;
+        }
+        let index = ((y as usize) * (self.width as usize) + (x as usize)) * 4;
+        let bgra = self.pixels.get(index..index + 4)?;
+        Some([bgra[2], bgra[1], bgra[0]])
+    }
+
     /// Convert to an RGBA image.
     ///
     /// The X server hands back BGRA on the little-endian, 24-bit displays this
