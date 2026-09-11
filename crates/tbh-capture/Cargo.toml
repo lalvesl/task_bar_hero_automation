@@ -1,0 +1,14 @@
+[package]
+name = "tbh-capture"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+version.workspace = true
+
+[dependencies]
+image.workspace = true
+thiserror.workspace = true
+x11rb.workspace = true
+
+[lints]
+workspace = true
