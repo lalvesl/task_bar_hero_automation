@@ -3,7 +3,7 @@ members = [
   "crates/tbh-capture",
   "crates/tbh-core",
   "crates/tbh-input",
-  "crates/tbh-tui",
+  "crates/tbh-cli",
   "crates/tbh-vision",
 ]
 resolver = "3"
@@ -23,7 +23,7 @@ serde = { version = "1", features = ["derive"] }
 thiserror = "2"
 toml = "1"
 tracing = "0.1"
-x11rb = "0.14"
+x11rb = { version = "0.14", features = ["xtest"] }
 
 tbh-capture = { path = "crates/tbh-capture" }
 tbh-core = { path = "crates/tbh-core" }
