@@ -1,0 +1,42 @@
+[workspace]
+members = [
+  "crates/tbh-capture",
+  "crates/tbh-core",
+  "crates/tbh-input",
+  "crates/tbh-tui",
+  "crates/tbh-vision",
+]
+resolver = "3"
+
+[workspace.package]
+edition = "2024"
+license = "MIT"
+rust-version = "1.96"
+version = "0.1.0"
+
+[workspace.dependencies]
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
+image = { version = "0.25", default-features = false, features = ["png"] }
+imageproc = { version = "0.27", default-features = false }
+serde = { version = "1", features = ["derive"] }
+thiserror = "2"
+toml = "1"
+tracing = "0.1"
+x11rb = "0.14"
+
+tbh-capture = { path = "crates/tbh-capture" }
+tbh-core = { path = "crates/tbh-core" }
+tbh-input = { path = "crates/tbh-input" }
+tbh-vision = { path = "crates/tbh-vision" }
+
+# Pedantic and nursery run as warnings across the workspace. The numeric budgets
+# they enforce live in clippy.toml; see docs/development_standards.md for the
+# rationale and the escape hatch.
+[workspace.lints.clippy]
+nursery = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+
+[workspace.lints.rust]
+missing_docs = "warn"
+unsafe_code = "forbid"
