@@ -456,3 +456,57 @@ forwarder from 127.0.0.1 into that socket. The sandbox reaches the loopback
 port; nothing else reaches anything. Both xauth entries carry the same cookie,
 which works because MIT-MAGIC-COOKIE-1 authenticates the bytes rather than the
 transport.
+
+### One command, and the four bugs that took
+
+`tbh run` now brings up the display, asks Steam for the game, waits out the
+opening sequence, drives the UI to a known state, and takes commands on stdin.
+`show` and `hide` open and close a mirror of the display. A person clicking in
+that mirror pauses the bot, and it resumes once they stop.
+
+Getting there turned up four failures worth writing down, because each looked
+like something other than what it was.
+
+**The window id goes stale.** The game destroys its first window during loading
+and creates another, so an id captured at launch becomes invalid partway
+through startup. Every request that fails with a bad window now rebinds by
+title and retries once.
+
+**The window moves after launch.** Unity restores a saved position from the Wine
+registry a moment after the window appears, and that position has a negative y.
+`GetImage` rejects any rectangle not wholly on screen, so a position check done
+once at startup turns into a `BadMatch` on every capture from then on. It is now
+checked before every capture.
+
+**Keys went nowhere.** The isolated display has no window manager, so nothing
+ever sets an input focus and the server stays on `PointerRoot`: key events go to
+whatever window the pointer happens to be over. Pressing Tab worked right after
+a click and silently did nothing otherwise, which made it look intermittent
+rather than unfocused. The restore sequence now sets the focus explicitly.
+
+**Tab twice is only right half the time.** Closing and reopening the menu does
+normalise its state, but only when it was open to begin with. At startup it is
+closed, so the first Tab opened it and the second closed it again, and every
+click afterwards landed on nothing. Whether the menu is open is now read off its
+red title banner, the same shape of check the synthesize button and the launch
+dialog use.
+
+That check has now paid for itself three times over, which is the argument for
+it: a relative comparison between two channels of one pixel is cheap enough to
+use wherever a yes-or-no question about the screen comes up.
+
+### The observer cannot read the device id
+
+`x11vnc` injects the viewer's clicks through `XTEST`, the same path the bot
+uses, so the source device separates nothing. What separates them is that the
+bot knows what it sent: every injected click is recorded, and an observed press
+that matches a recent one in place and time is ours.
+
+The ledger is reconciled immediately after each injected click rather than on
+the worker tick. An earlier version reconciled only on the tick, with a 600ms
+entry lifetime, and the restore sequence blocks for nearly three seconds. Its
+own clicks aged out before the queue was drained, read as a person taking over,
+and triggered another restore, forever.
+
+The limitation that remains: a person clicking the exact pixel the bot just
+clicked, inside the reconciliation window, is attributed to the bot.
