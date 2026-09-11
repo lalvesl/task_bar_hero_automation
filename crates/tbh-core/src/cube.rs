@@ -102,7 +102,7 @@ pub fn run(
 /// The rectangle is read per click rather than cached, so the task keeps
 /// working if the window is moved mid-run.
 fn click(
-    capture: &dyn Capture,
+    capture: &mut dyn Capture,
     pointer: &mut dyn Pointer,
     at: tbh_input::NormalizedPoint,
 ) -> Result<(), TaskError> {
