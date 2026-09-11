@@ -1,0 +1,13 @@
+[package]
+name = "tbh-input"
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+version.workspace = true
+
+[dependencies]
+thiserror.workspace = true
+x11rb.workspace = true
+
+[lints]
+workspace = true
