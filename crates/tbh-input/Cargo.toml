@@ -6,6 +6,8 @@ rust-version.workspace = true
 version.workspace = true
 
 [dependencies]
+serde = { workspace = true }
+tbh-capture.workspace = true
 thiserror.workspace = true
 x11rb.workspace = true
 
