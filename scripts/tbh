@@ -5,21 +5,21 @@
 #   ./scripts/tbh run
 #   ./scripts/tbh calibrate --out artifacts/frame.png
 #
-# This exists only to point XAUTHORITY at the cookie `xserver.sh` wrote. The
-# binary deliberately does not set that variable itself: doing so from Rust
-# needs `unsafe`, and the workspace forbids it for a one-line convenience.
+# This does two things the binary cannot do for itself.
+#
+# It points XAUTHORITY at the cookie `xserver.sh` wrote. Setting an environment
+# variable from Rust now needs `unsafe`, and the workspace forbids it for a
+# one-line convenience.
+#
+# It enters the project dev shell, which is what puts socat, x11vnc and
+# vncviewer on PATH. The display and the `show` command need those, and none of
+# them is in a plain user environment.
 
 set -euo pipefail
 
-state_dir="${XDG_RUNTIME_DIR:-/tmp}/tbh-automation"
-auth="$state_dir/Xauthority"
-
-if [[ ! -r "$auth" ]]; then
-  echo "tbh: no display cookie at $auth. Run scripts/xserver.sh start first." >&2
-  exit 1
-fi
-
 repo_root="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$repo_root"
+
 binary="$repo_root/target/release/tbh"
 [[ -x "$binary" ]] || binary="$repo_root/target/debug/tbh"
 
@@ -28,5 +28,19 @@ if [[ ! -x "$binary" ]]; then
   exit 1
 fi
 
-cd "$repo_root"
-exec env XAUTHORITY="$auth" "$binary" "$@"
+state_dir="${XDG_RUNTIME_DIR:-/tmp}/tbh-automation"
+auth="$state_dir/Xauthority"
+
+# `run` brings the display up itself, so the cookie need not exist yet. Every
+# other subcommand talks to a display that is already there.
+if [[ "${1:-}" != "run" && ! -r "$auth" ]]; then
+  echo "tbh: no display cookie at $auth. Run scripts/xserver.sh start first." >&2
+  exit 1
+fi
+
+# Already inside the dev shell: run directly rather than nesting another.
+if command -v socat >/dev/null && command -v x11vnc >/dev/null; then
+  exec env XAUTHORITY="$auth" "$binary" "$@"
+fi
+
+exec nix develop -c env XAUTHORITY="$auth" "$binary" "$@"
