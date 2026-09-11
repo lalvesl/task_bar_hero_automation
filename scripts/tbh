@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+#
+# Run the bot against the isolated display.
+#
+#   ./scripts/tbh run
+#   ./scripts/tbh calibrate --out artifacts/frame.png
+#
+# This exists only to point XAUTHORITY at the cookie `xserver.sh` wrote. The
+# binary deliberately does not set that variable itself: doing so from Rust
+# needs `unsafe`, and the workspace forbids it for a one-line convenience.
+
+set -euo pipefail
+
+state_dir="${XDG_RUNTIME_DIR:-/tmp}/tbh-automation"
+auth="$state_dir/Xauthority"
+
+if [[ ! -r "$auth" ]]; then
+  echo "tbh: no display cookie at $auth. Run scripts/xserver.sh start first." >&2
+  exit 1
+fi
+
+repo_root="$(cd "$(dirname "$0")/.." && pwd)"
+binary="$repo_root/target/release/tbh"
+[[ -x "$binary" ]] || binary="$repo_root/target/debug/tbh"
+
+if [[ ! -x "$binary" ]]; then
+  echo "tbh: no binary built. Run: nix develop -c cargo build" >&2
+  exit 1
+fi
+
+cd "$repo_root"
+exec env XAUTHORITY="$auth" "$binary" "$@"
