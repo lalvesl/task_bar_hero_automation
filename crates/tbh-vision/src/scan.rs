@@ -40,6 +40,10 @@ impl ChestScan {
     ///
     /// # Errors
     /// Fails if the region falls outside the unit square.
+    /// The narrowing casts inside turn a fraction that is by construction
+    /// between 0 and 1 into an f32, where the precision is ample for a pixel
+    /// position.
+    #[allow(clippy::cast_possible_truncation)]
     pub fn find(&self, frame: &Frame) -> Result<Vec<SamplePoint>, VisionError> {
         let (left, top, width, height) = self.region.resolve(frame)?;
         if width == 0 || height == 0 {
@@ -85,6 +89,9 @@ fn runs(occupied: &[bool], max_gap: u32) -> Vec<(u32, u32)> {
     let mut out: Vec<(u32, u32)> = Vec::new();
     let mut current: Option<(u32, u32)> = None;
 
+    // The slice is one band of one frame, so its length is a screen width and
+    // the narrowing cannot lose anything.
+    #[allow(clippy::cast_possible_truncation)]
     for (index, &is_content) in occupied.iter().enumerate() {
         let index = index as u32;
         if !is_content {
