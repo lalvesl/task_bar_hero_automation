@@ -5,8 +5,20 @@
 //! screen to redraw and nothing to lay out.
 
 use std::io::{BufRead as _, Write as _};
+use std::path::PathBuf;
 
 use crate::control::{Control, Task, lock};
+use crate::viewer::Viewer;
+
+/// What `show` needs to know to put a mirror on screen.
+pub struct Mirror {
+    /// The display to mirror.
+    pub display: String,
+    /// Loopback port to serve on.
+    pub port: u16,
+    /// The isolated display cookie.
+    pub auth: PathBuf,
+}
 
 /// What the operator can type.
 const HELP: &str = "\
@@ -15,6 +27,8 @@ commands:
   disable <task>    stop the task running
   run <task>        run the task now, without waiting for the interval
   status            what is on, and what the last run did
+  show              open a window onto the game
+  hide              close it again
   help              this text
   quit              stop the bot
 
@@ -27,13 +41,15 @@ tasks:
 /// # Errors
 /// Fails only if stdin itself breaks; an unrecognised command is reported to
 /// the operator and the loop continues.
-pub fn run(control: &Control) -> anyhow::Result<()> {
+pub fn run(control: &Control, mirror: &Mirror) -> anyhow::Result<()> {
+    let mut viewer = Viewer::default();
+
     println!("tbh: type \"help\" for commands");
     prompt();
 
     for line in std::io::stdin().lock().lines() {
         let line = line?;
-        if !dispatch(control, line.trim()) {
+        if !dispatch(control, &mut viewer, mirror, line.trim()) {
             break;
         }
         prompt();
@@ -44,14 +60,23 @@ pub fn run(control: &Control) -> anyhow::Result<()> {
 }
 
 /// Act on one line. Returns false when the loop should end.
-fn dispatch(control: &Control, line: &str) -> bool {
+fn dispatch(control: &Control, viewer: &mut Viewer, mirror: &Mirror, line: &str) -> bool {
     let (verb, rest) = line.split_once(char::is_whitespace).unwrap_or((line, ""));
 
     match verb {
         "" => {}
         "help" | "?" => println!("{HELP}"),
         "status" => status(control),
+        "show" => match viewer.show(&mirror.display, mirror.port, &mirror.auth) {
+            Ok(()) => println!("showing {}", mirror.display),
+            Err(error) => println!("show failed: {error:#}"),
+        },
+        "hide" | "hidden" => {
+            viewer.hide();
+            println!("hidden");
+        }
         "quit" | "exit" => {
+            viewer.hide();
             lock(control).shutdown = true;
             println!("stopping");
             return false;
