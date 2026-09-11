@@ -6,6 +6,7 @@
 //! also why the `uinput` backend an on-desktop design would need was dropped;
 //! `uinput` injects into the host seat and would miss this display entirely.
 
+pub mod watch;
 pub mod x11;
 
 use tbh_capture::WindowRect;
@@ -103,6 +104,10 @@ pub enum InputError {
     #[error("the X server does not support XTEST")]
     XTestUnavailable,
 
+    /// The server does not offer `XInput2`, so human clicks cannot be observed.
+    #[error("the X server does not support XInput2")]
+    XInputUnavailable,
+
     /// A normalized coordinate fell outside the window.
     #[error("{axis} coordinate {value} is outside the window")]
     OutOfWindow {
@@ -130,7 +135,10 @@ pub enum InputError {
 /// recording fake instead of a live display.
 pub trait Pointer {
     /// Move the pointer to a point in `within` and press and release a button
-    /// there.
+    /// there, returning where on screen it landed.
+    ///
+    /// The resolved position is returned rather than discarded because a caller
+    /// that observes the display needs to recognise its own click coming back.
     ///
     /// # Errors
     /// Fails if the display is unreachable, the point is outside the window, or
@@ -140,7 +148,7 @@ pub trait Pointer {
         at: NormalizedPoint,
         within: WindowRect,
         button: Button,
-    ) -> Result<(), InputError>;
+    ) -> Result<(i16, i16), InputError>;
 }
 
 /// A keyboard that can press and release a key.
