@@ -12,5 +12,6 @@ pkgs: with pkgs; [
   xwininfo
   xdpyinfo
   imagemagick
+  socat # the loopback forwarder in scripts/xserver.sh
   xorg-server # provides Xvfb and Xephyr
 ]
