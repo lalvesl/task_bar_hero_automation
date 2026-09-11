@@ -108,7 +108,7 @@ impl Pointer for X11Input {
         at: NormalizedPoint,
         within: WindowRect,
         button: Button,
-    ) -> Result<(), InputError> {
+    ) -> Result<(i16, i16), InputError> {
         let (x, y) = at.resolve(within)?;
         let detail = match button {
             Button::Left => 1,
@@ -120,7 +120,7 @@ impl Pointer for X11Input {
         self.fake(BUTTON_PRESS, detail, x, y)?;
         sleep(DWELL);
         self.fake(BUTTON_RELEASE, detail, x, y)?;
-        Ok(())
+        Ok((x, y))
     }
 }
 
