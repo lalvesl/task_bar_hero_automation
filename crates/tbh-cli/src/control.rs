@@ -94,11 +94,35 @@ pub struct State {
     pub synthesis_now: bool,
     /// Collecting from the chest slots.
     pub chests: TaskState<ChestPass>,
+    /// When the bot may act again, set whenever a person clicks in the viewer.
+    ///
+    /// A person and the bot clicking the same UI would fight. The bot stands
+    /// down for a fixed window after every click of theirs, so a person
+    /// working continuously keeps it down without having to disable anything.
+    pub paused_until: Option<Instant>,
+
+    /// Whether the UI has to be driven back to a known state before the tasks
+    /// resume, because a person has been clicking around in it.
+    pub needs_restore: bool,
+
     /// Set by `quit`, so the worker can finish its current step and stop.
     pub shutdown: bool,
 }
 
 impl State {
+    /// Whether a person is still considered to be using the display.
+    #[must_use]
+    pub fn paused(&self) -> bool {
+        self.paused_until
+            .is_some_and(|until| Instant::now() < until)
+    }
+
+    /// Stand down for `window`, and remember the UI needs putting back.
+    pub fn pause_for(&mut self, window: Duration) {
+        self.paused_until = Some(Instant::now() + window);
+        self.needs_restore = true;
+    }
+
     /// Start from the configuration's own switches.
     #[must_use]
     pub const fn new(synthesis_enabled: bool, chests_enabled: bool) -> Self {
@@ -106,6 +130,8 @@ impl State {
             synthesis: TaskState::new(synthesis_enabled),
             synthesis_now: false,
             chests: TaskState::new(chests_enabled),
+            paused_until: None,
+            needs_restore: false,
             shutdown: false,
         }
     }
