@@ -146,7 +146,7 @@ swapped without touching its callers.
 | `tbh-input` | `Pointer` trait: move, click. `XTEST` backend. |
 | `tbh-vision` | Template matching, pixel-signature checks, region-of-interest cropping. |
 | `tbh-core` | Hardcoded state machines for the chest and cube tasks, plus the TOML config for tunables. |
-| `tbh-tui` | ratatui binary: live log, per-task toggles, calibration subcommand. |
+| `tbh-cli` | The `tbh` binary: the control process, plus the calibration subcommands. |
 
 ### 3.1 Vision
 
@@ -228,13 +228,12 @@ artifact is a calibration tool, not a bot.
 
 ### M6 — Chest task
 
-The simplest end-to-end loop, and therefore the one that validates capture,
-match, and click together.
+Poll the band chests drop into, find every one, click them all.
 
-- Poll frames on an interval, template-match the chest sprites, click any hit.
-- Debounce so one chest is not clicked repeatedly.
-- **Done when** it runs unattended for a farming session and the chest count
-  rises with no stray clicks.
+No template matching. The band sits on pure black, so a chest is a run of
+columns that are not black, and a scan of a thin band replaces a correlation
+over the frame. It also handles however many chests appear, rather than however
+many sprites were cut into templates.
 
 ### M7 — Cube task
 
@@ -252,12 +251,23 @@ one pixel-signature check.
 - **Done when** a run drains the available items of the target rarity and exits
   cleanly instead of spinning.
 
-### M8 — ratatui TUI
+### M8 — the control process
 
-Only after the core runs headless against a log.
+Not a full-screen interface. A process that stays up, drives the enabled tasks
+on their intervals, and takes plain commands on stdin:
 
-- Live event log, per-task toggles, current-state readout.
-- Capture and match latency, so a slow matcher is visible rather than inferred.
+```
+> enable synthesis
+> status
+> run synthesis
+> disable synthesis
+> quit
+```
+
+A ratatui interface was the original plan and was dropped. There is no screen
+worth redrawing here: the operator turns a task on, checks on it occasionally,
+and turns it off. Lines of text do that with none of the layout, no event loop
+of its own, and it pipes and scripts like anything else.
 
 ## 5. Configuration
 
@@ -338,3 +348,111 @@ Verified: `nix flake check` passes, `nix build .#default` produces a running
 
 One inherited item was dropped: `deny.toml` ignored `RUSTSEC-2023-0089` for
 `atomic-polyfill`, which no crate in this dependency tree pulls in.
+
+### M3 and M4 — passed, 2026-09-11
+
+`tbh calibrate` connects to the isolated display, finds the window by title,
+captures it and writes a PNG. `tbh click` and `tbh key` drive the pointer and
+keyboard through `XTEST`. All of it is `x11rb`; no `xdotool` remains in the
+Rust path.
+
+Three findings.
+
+**Windows must be nudged on-screen.** The isolated display runs no window
+manager, so the game places itself and nothing corrects it; it landed at a
+negative y offset. `GetImage` on a window rejects any rectangle not wholly
+within the visible screen, so capture failed outright. `ensure_onscreen` moves
+the window before capturing, and errors clearly when the window is larger than
+the virtual screen rather than returning a silently clipped frame.
+
+**Synthetic clicks need to dwell.** A motion, press and release sent back to
+back did nothing. Unity samples input once per frame, and the game runs near 30
+frames per second, so all three events landed inside one frame and the engine
+never saw a transition. A 50ms dwell between events fixed it. This is why the
+`xdotool` spike worked where the first Rust version did not: `xdotool` inserts
+its own delays.
+
+**The window size is the player's own setting.** Unity stores it in the Wine
+registry under `Software\TesseractStudio\TaskBarHero`, and it does not track the
+virtual screen size in any predictable way. The virtual screen is therefore
+sized to fit the window, not the other way around.
+
+The UI map that came out of calibration lives in `docs/ui_map.md`, including the
+answer to the open question about the cube's rarity selector, and the two states
+of the synthesize button.
+
+### M5, M7 and M8 — passed, 2026-09-11
+
+The cube task runs end to end, and the control process is up.
+
+**The vision layer is smaller than planned.** Because the game's panels hold
+fixed positions, the cube needs no template matching at all. What it needs is
+one predicate: does the blue channel lead the red channel by a margin, at three
+sampled pixels. `ChannelLead` in `tbh-vision` is that, with the real disabled
+and enabled colours from the game as its unit tests. Template matching is still
+coming, but only for M6's chests, whose position is genuinely unpredictable.
+
+**Why a relative colour test and not a stored colour.** Disabled, the button is
+pure grey and all three channels are equal. Enabled, it is blue and leads red by
+around 80. Comparing two channels of the same pixel survives brightness drift,
+hover highlighting and a repaint in a future patch; comparing against a stored
+RGB triple would have to be recalibrated after any of those.
+
+**Two stops, not one.** The task stops when auto-fill can no longer fill the
+grid, read off the button. It also stops at `max_per_run`, which does not depend
+on reading the screen correctly at all. If the colour check ever misreads, the
+second stop is what keeps the loop finite.
+
+**The panel is cycled between syntheses.** The synthesised item is left sitting
+in the grid, and toggling the cube panel clears it. That is cheaper and more
+reliable than finding and clicking the grid's own clear control.
+
+**The task ships switched off.** A bot that clicks on its own should not start
+clicking merely because the process came up.
+
+**`XAUTHORITY` is handled by a wrapper, not by the binary.** Setting an
+environment variable from Rust now requires `unsafe`, and the workspace forbids
+it. `scripts/tbh` points the variable at the cookie `xserver.sh` wrote. A policy
+worth having is worth not bending for a one-line convenience.
+
+The crate formerly called `tbh-tui` is now `tbh-cli`, since the old name
+describes an interface that is no longer being built.
+
+### M6 — passed, 2026-09-11
+
+The chest task finds and clicks every chest in the band, and the control process
+drives it alongside the cube.
+
+**The chests are not drops.** They are permanent slots holding a queue, and the
+dots underneath are the count. Clicking collects one. So the slots do not
+disappear while the queue has anything in it, and a pass that reports the same
+two chests every time is correct rather than stuck.
+
+**A gap tolerance as wide as the gap merged both chests into one.** The two
+slots sit six columns of background apart, and `max_gap` was set to 0.005, which
+is six pixels at this window size. The scan bridged them into a single run whose
+centre is the empty space between them, so every click landed on nothing and
+the chests stayed put. The symptom looked exactly like a task that was not
+working; the loop was right and the number was wrong. Both the merged and the
+separated case are now unit tests, built from the real measurements.
+
+**The region is wider than the two slots seen during calibration**, because the
+row can hold more, and the per-pass cap is generous for the same reason.
+
+Template matching was planned for this milestone and is not needed anywhere in
+v1. The vision crate carries a channel comparison and a column scan, and nothing
+else.
+
+### The display is on loopback only
+
+The first working version had the X server itself listen on TCP, because that is
+the one transport Steam's sandbox can reach. That put the display on every
+network interface: `-listen tcp` binds 0.0.0.0 and Xorg has no option to choose
+an address. A magic cookie was the only thing in front of a live view of the
+screen and an input channel into it.
+
+The server now opens its unix socket only, and `scripts/xserver.sh` runs a socat
+forwarder from 127.0.0.1 into that socket. The sandbox reaches the loopback
+port; nothing else reaches anything. Both xauth entries carry the same cookie,
+which works because MIT-MAGIC-COOKIE-1 authenticates the bytes rather than the
+transport.
