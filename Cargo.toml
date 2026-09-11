@@ -23,7 +23,7 @@ serde = { version = "1", features = ["derive"] }
 thiserror = "2"
 toml = "1"
 tracing = "0.1"
-x11rb = { version = "0.14", features = ["xtest"] }
+x11rb = { version = "0.14", features = ["xinput", "xtest"] }
 
 tbh-capture = { path = "crates/tbh-capture" }
 tbh-core = { path = "crates/tbh-core" }
