@@ -149,6 +149,22 @@ pub trait Pointer {
         within: WindowRect,
         button: Button,
     ) -> Result<(i16, i16), InputError>;
+
+    /// Whether a person has taken over the display since this pointer started
+    /// being used.
+    ///
+    /// Sequences that take seconds check this between steps and stand down.
+    /// Without it a resume that began the moment someone paused for breath
+    /// carries on clicking through everything they do next.
+    ///
+    /// Defaults to false, so a pointer with no way to observe the display
+    /// simply never yields.
+    ///
+    /// # Errors
+    /// Fails if the display connection breaks while checking.
+    fn interrupted(&mut self) -> Result<bool, InputError> {
+        Ok(false)
+    }
 }
 
 /// A keyboard that can press and release a key.
