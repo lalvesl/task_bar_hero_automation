@@ -8,6 +8,7 @@ use std::path::Path;
 use serde::{Deserialize, Serialize};
 use tbh_input::NormalizedPoint;
 use tbh_vision::ChannelLead;
+use tbh_vision::region::RegionLead;
 use tbh_vision::scan::ChestScan;
 
 /// The whole configuration file.
@@ -101,10 +102,12 @@ impl Config {
 /// Where the stash panel's controls are.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct StashConfig {
-    /// The stash icon on the main menu's bottom row.
+    /// The stash icon on the main menu bottom row.
     pub menu_icon: NormalizedPoint,
     /// The button that deposits the whole inventory.
     pub store_all: NormalizedPoint,
+    /// How to tell whether the stash panel is open.
+    pub panel_visible: ChannelLead,
 }
 
 /// The cube task: whether it runs, how, and where its controls are.
@@ -123,7 +126,19 @@ pub struct CubeConfig {
     pub store_all_first: bool,
 
     /// Seconds between runs while the task is enabled.
+    ///
+    /// The floor, not the schedule: `after_chest` is what usually decides when
+    /// a run happens.
     pub interval_secs: u32,
+
+    /// Run as soon as a chest pass has collected something.
+    ///
+    /// A chest puts items in the inventory, and the inventory has a fixed
+    /// number of slots. A night of collecting without synthesizing filled them
+    /// and the game stopped accepting anything more, which no interval short
+    /// of the time it takes to fill the slots would have prevented. Tying the
+    /// run to the thing that fills the slots does.
+    pub after_chest: bool,
 
     /// Upper bound on syntheses in one run.
     ///
@@ -140,6 +155,22 @@ pub struct CubeConfig {
 
     /// How to tell whether the synthesize button is enabled.
     pub synthesize_enabled: ChannelLead,
+
+    /// How to tell the cube is in synthesis mode rather than one of the seven
+    /// others the mode selector offers.
+    ///
+    /// In synthesis mode the selector icon is blue; in every other mode it is
+    /// not. Without this check, a cube left on Creation looks exactly like an
+    /// exhausted inventory: auto-fill does nothing useful and the synthesize
+    /// button stays grey.
+    pub mode_is_synthesis: RegionLead,
+
+    /// How to tell whether the cube panel is open at all.
+    ///
+    /// Without this, a panel that failed to reopen and an inventory with
+    /// nothing left to combine look identical: in both cases auto-fill leaves
+    /// the synthesize button grey.
+    pub panel_visible: ChannelLead,
 }
 
 /// Everything that can go wrong while loading configuration.
