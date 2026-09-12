@@ -6,6 +6,7 @@
 //! only runs for targets whose position cannot be known in advance. In the v1
 //! scope that last case is dropped chests, and nothing else.
 
+pub mod region;
 pub mod scan;
 
 use serde::{Deserialize, Serialize};
