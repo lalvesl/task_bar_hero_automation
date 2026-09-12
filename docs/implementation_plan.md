@@ -264,6 +264,36 @@ on their intervals, and takes plain commands on stdin:
 > quit
 ```
 
+`run <task>` asks for a run that is not due yet, and refuses when the task is
+switched off. `force <task>` is the same request with both of the things that
+would hold it back taken out of the way: the task's own switch, and the
+stand-down window a person's clicks put in place. Neither is changed
+permanently, so a forced task is still disabled afterwards and the next click
+still pauses the bot. The menus are still put back first, since a forced run
+needs a known UI as much as a scheduled one does.
+
+`stop` and `start` are the whole bot rather than one task. `stop` takes the
+game away and keeps it: no interval, no queued request, and no quiet display
+gives it back, only a typed `start`. A person's click causes the same
+stand-down with a timer on it, so working in the game for a while needs nothing
+typed at all, and every further click pushes the timer out again. The two are
+one value, `Halt`, rather than a pause beside a switch, because they have to be
+ordered against each other and a pair of fields cannot say which wins. The
+order is that a typed stop outranks a timer: a click never puts an expiry on
+it.
+
+A synthesis run is also queued as soon as a chest pass collects something,
+under `cube.after_chest`. A night of collecting without synthesizing filled the
+inventory slots and the game stopped accepting anything more, since the pieces
+were too fragmented for the syntheses to close. No interval shorter than the
+time it takes to fill the slots would have prevented that, and tying the run to
+the thing that fills them does.
+
+The request itself lives in the task's own state as `queued`, rather than as a
+pair of flags beside it. Both verbs set the same field; the difference between
+them is entirely in what the command loop checks before setting it, so by the
+time the worker looks there is nothing left to decide.
+
 A ratatui interface was the original plan and was dropped. There is no screen
 worth redrawing here: the operator turns a task on, checks on it occasionally,
 and turns it off. Lines of text do that with none of the layout, no event loop
