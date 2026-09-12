@@ -7,7 +7,7 @@
 use std::io::{BufRead as _, Write as _};
 use std::path::PathBuf;
 
-use crate::control::{Control, Task, lock};
+use crate::control::{Control, Halt, Task, lock};
 use crate::viewer::Viewer;
 
 /// What `show` needs to know to put a mirror on screen.
@@ -26,6 +26,10 @@ commands:
   enable <task>     let the task run on its interval
   disable <task>    stop the task running
   run <task>        run the task now, without waiting for the interval
+  force <task>      the same, but also when the task is disabled, and
+                    without waiting out a pause
+  stop              hands off the game, without forgetting anything
+  start             hands back on, putting the menus back first
   status            what is on, and what the last run did
   show              open a window onto the game
   hide              close it again
@@ -34,7 +38,9 @@ commands:
 
 tasks:
   synthesis         equipment synthesis in the cube
-                    also accepted: \"synthesis equipment\", \"cube\"";
+                    also accepted: \"synthesis equipment\", \"cube\"
+  chests            collecting the chests
+                    also accepted: \"chest\", \"open chests\"";
 
 /// Read commands until end of input or `quit`.
 ///
@@ -67,6 +73,14 @@ fn dispatch(control: &Control, viewer: &mut Viewer, mirror: &Mirror, line: &str)
         "" => {}
         "help" | "?" => println!("{HELP}"),
         "status" => status(control),
+        "stop" => {
+            lock(control).stop();
+            println!("stopped; type \"start\" to hand the game back");
+        }
+        "start" => {
+            lock(control).start();
+            println!("started; putting the menus back first");
+        }
         "show" => match viewer.show(&mirror.display, mirror.port, &mirror.auth) {
             Ok(()) => println!("showing {}", mirror.display),
             Err(error) => println!("show failed: {error:#}"),
@@ -82,7 +96,8 @@ fn dispatch(control: &Control, viewer: &mut Viewer, mirror: &Mirror, line: &str)
             return false;
         }
         "enable" | "disable" => set_enabled(control, rest, verb == "enable"),
-        "run" => run_now(control, rest),
+        "run" => run_now(control, rest, false),
+        "force" => run_now(control, rest, true),
         _ => println!("unknown command {verb:?}; type \"help\""),
     }
     true
@@ -107,37 +122,65 @@ fn set_enabled(control: &Control, rest: &str, enabled: bool) {
 }
 
 /// Ask for a task to run without waiting for its interval.
-fn run_now(control: &Control, rest: &str) {
+///
+/// `force` is the same request with the two things that would hold it back
+/// taken out of the way: the task's own switch, and the stand-down window a
+/// person's clicks put in place. Neither is changed permanently. A forced task
+/// stays disabled afterwards, and the next click pauses the bot again.
+fn run_now(control: &Control, rest: &str, force: bool) {
     let Some(task) = Task::parse(rest) else {
         println!("unknown task {rest:?}; type \"help\"");
         return;
     };
 
-    match task {
-        Task::Synthesis => {
-            // The guard is dropped before printing: holding a lock across I/O
-            // would let a slow terminal stall the worker.
-            let queued = {
-                let mut state = lock(control);
-                let enabled = state.synthesis.enabled;
-                state.synthesis_now |= enabled;
-                enabled
-            };
-            if queued {
-                println!("synthesis: queued");
-            } else {
-                println!("synthesis is disabled; enable it first");
+    // The guard is dropped before printing: holding a lock across I/O would
+    // let a slow terminal stall the worker.
+    let queued = {
+        let mut state = lock(control);
+        let enabled = match task {
+            Task::Synthesis => state.synthesis.enabled,
+            Task::Chests => state.chests.enabled,
+        };
+        let queued = enabled || force;
+        if queued {
+            match task {
+                Task::Synthesis => state.synthesis.queued = true,
+                Task::Chests => state.chests.queued = true,
             }
         }
-        // The chest task runs every couple of seconds on its own, so there is
-        // nothing a manual trigger would bring forward.
-        Task::Chests => println!("chests runs continuously; enable it instead"),
+        // A click stand-down is a guess that a person is working in the game,
+        // and an explicit `force` outranks a guess. A typed `stop` is not a
+        // guess, so that one stands and the request waits behind it.
+        if force && matches!(state.halt, Halt::Clicked(_)) {
+            state.halt = Halt::Running;
+        }
+        queued
+    };
+
+    if queued {
+        println!("{}: queued", task.name());
+        // Said here because a request that sits there silently looks like one
+        // that was dropped.
+        if lock(control).halt == Halt::Manual {
+            println!("  the bot is stopped; it will run after \"start\"");
+        }
+    } else {
+        println!(
+            "{} is disabled; enable it first, or type \"force {}\"",
+            task.name(),
+            task.name()
+        );
     }
 }
 
 /// Report the switches and the last result.
 fn status(control: &Control) {
     let state = lock(control);
+    match state.halt {
+        Halt::Manual => println!("stopped: nothing runs until \"start\""),
+        _ if state.halted() => println!("stopped: you are using the display"),
+        _ => {}
+    }
     report(
         "synthesis",
         state.synthesis.enabled,
