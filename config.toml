@@ -40,8 +40,13 @@ enabled = false
 # too, so this is what makes a full inventory available to the cube.
 store_all_first = true
 
-# Seconds between runs while the task is enabled.
+# Seconds between runs while the task is enabled. A floor, not the schedule:
+# after_chest is what usually decides when a run happens.
 interval_secs = 600
+
+# Run as soon as a chest pass collects something. Chests fill the inventory
+# slots, and a full inventory stops the game accepting anything more.
+after_chest = true
 
 # A stop that does not depend on reading the screen correctly.
 max_per_run = 100
@@ -122,4 +127,49 @@ points = [
   { x = 0.4455, y = 0.2978 },
   { x = 0.5545, y = 0.2978 },
   { x = 0.5000, y = 0.3049 },
+]
+
+# Whether the cube panel itself is open. Its title banner is red; with the panel
+# closed the same pixels are black.
+#
+# This exists because a panel that failed to reopen and an inventory with
+# nothing left to combine look identical from the synthesize button alone: both
+# leave it grey.
+[cube.panel_visible]
+lead = "red"
+over = "blue"
+min_delta = 30
+points = [
+  { x = 0.7756, y = 0.2978 },
+  { x = 0.8870, y = 0.2978 },
+  { x = 0.8317, y = 0.3049 },
+]
+
+# Whether the cube is in synthesis mode. The selector icon is blue in synthesis
+# and beige or grey in the seven other modes.
+#
+# Worth checking because a cube left on another mode is indistinguishable from
+# an exhausted inventory: in both cases auto-fill achieves nothing and the
+# synthesize button stays grey.
+# Averaged over the icon rather than sampled at points: the icon is twelve
+# pixels across with black gaps between its strokes, so a normalized coordinate
+# truncating one pixel lower lands on background and the test fails. Averaged,
+# blue leads red by about 20 in synthesis and trails it by about 26 elsewhere.
+[cube.mode_is_synthesis]
+lead = "blue"
+over = "red"
+min_delta = 8
+region = { x = 0.7145, y = 0.3372, width = 0.0198, height = 0.0197 }
+
+# Whether the stash panel is open, read off its red title banner. Needed for the
+# same reason the cube's is: the menu icons toggle, so opening one blindly
+# closes it when it was already open.
+[stash.panel_visible]
+lead = "red"
+over = "blue"
+min_delta = 30
+points = [
+  { x = 0.1073, y = 0.2978 },
+  { x = 0.2228, y = 0.2978 },
+  { x = 0.1650, y = 0.3049 },
 ]
